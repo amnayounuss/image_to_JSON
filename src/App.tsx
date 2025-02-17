@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
 import { createWorker } from 'tesseract.js';
-import ISO6391 from 'iso-639-1';
 import { ImageUploader } from './components/ImageUploader';
 import { TranslationPreview } from './components/TranslationPreview';
 import { ExtractedText, TranslationEntry } from './types';
@@ -14,19 +13,21 @@ import { FileText } from 'lucide-react';
 function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [entries, setEntries] = useState<TranslationEntry[]>([]);
-  const [selectedLanguage, setSelectedLanguage] = useState('en');
 
   const handleImageUpload = useCallback(async (file: File) => {
     setIsProcessing(true);
     try {
       const worker = await createWorker();
-      await worker.loadLanguage(selectedLanguage); // Load the appropriate language
-      await worker.initialize(selectedLanguage);
+      await worker.loadLanguage('eng'); // Always use English
+      await worker.initialize('eng');
 
-      const { data: { text, confidence } } = await worker.recognize(file);
+      const {
+        data: { text, confidence },
+      } = await worker.recognize(file);
 
       if (text && confidence) {
-        const extractedText: ExtractedText = { text, confidence };
+        const filteredText = text.replace(/[^a-zA-Z0-9.,!?\s]/g, ''); // Remove icons & symbols
+        const extractedText: ExtractedText = { text: filteredText, confidence };
         const processedEntries = processExtractedText(extractedText);
         setEntries(processedEntries);
       }
@@ -38,17 +39,12 @@ function App() {
     } finally {
       setIsProcessing(false);
     }
-  }, [selectedLanguage]);
+  }, []);
 
   const handleDownload = useCallback(() => {
     const jsonData = generateJsonFile(entries);
-    downloadJson(jsonData, `translations_${selectedLanguage}.json`);
-  }, [entries, selectedLanguage]);
-
-  const languages = ISO6391.getAllCodes().map(code => ({
-    code,
-    name: ISO6391.getName(code),
-  }));
+    downloadJson(jsonData, `translations_en.json`);
+  }, [entries]);
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -64,33 +60,8 @@ function App() {
         </div>
 
         <div className="bg-white shadow rounded-lg p-6">
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Target Language
-            </label>
-            <select
-              value={selectedLanguage}
-              onChange={(e) => setSelectedLanguage(e.target.value)}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            >
-              {languages.map(({ code, name }) => (
-                <option key={code} value={code}>
-                  {name} ({code})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <ImageUploader
-            onImageUpload={handleImageUpload}
-            isProcessing={isProcessing}
-          />
-
-          <TranslationPreview
-            entries={entries}
-            onDownload={handleDownload}
-            selectedLanguage={selectedLanguage}
-          />
+          <ImageUploader onImageUpload={handleImageUpload} isProcessing={isProcessing} />
+          <TranslationPreview entries={entries} onDownload={handleDownload} selectedLanguage={'en'} />
         </div>
       </div>
     </div>
